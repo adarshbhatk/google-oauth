@@ -53,7 +53,7 @@ app.get("/auth/google", passport.authenticate("google", {
   scope: ["https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"],
 }));
 
-app.get("/auth/google/secrets", passport.authenticate({
+app.get("/auth/google/secrets", passport.authenticate("google", {
   successRedirect: "/secrets",
   failureRedirect: "/login"
 }));
@@ -68,7 +68,7 @@ app.get("/logout", (req, res) => {
 });
 
 app.get("/secrets", (req, res) => {
-  console.log(req.user);
+  // console.log(req.user);
   if (req.isAuthenticated()) {
     res.render("secrets.ejs");
   } else {
@@ -156,7 +156,7 @@ passport.use("google", new GoogleStrategy({
   callbackURL: "http://localhost:3000/auth/google/secrets",
   userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
   }, async (accessToken, refreshToken, profile, cb) => {
-    console.log("Google Profile: ", profile);
+    // console.log("Google Profile: ", profile);
     try {
       const result = await db.query("SELECT * FROM users WHERE email = $1", [profile.email]);
       if(result.rows.length === 0) {
