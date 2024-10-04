@@ -4,6 +4,7 @@ import pg from "pg";
 import bcrypt from "bcrypt";
 import passport from "passport";
 import { Strategy } from "passport-local";
+import GoogleStrategy from "passport-google-oauth2";
 import session from "express-session";
 import env from "dotenv";
 
@@ -33,6 +34,7 @@ const db = new pg.Client({
   password: process.env.PG_PASSWORD,
   port: process.env.PG_PORT,
 });
+
 db.connect();
 
 app.get("/", (req, res) => {
@@ -46,6 +48,15 @@ app.get("/login", (req, res) => {
 app.get("/register", (req, res) => {
   res.render("register.ejs");
 });
+
+app.get("/auth/google", passport.authenticate("google", {
+  scope: ["https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"],
+}));
+
+app.get("/auth/google/secrets", passport.authenticate({
+  successRedirect: "/secrets",
+  failureRedirect: "/login"
+}));
 
 app.get("/logout", (req, res) => {
   req.logout(function (err) {
@@ -106,7 +117,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
-passport.use(
+passport.use("local", 
   new Strategy(async function verify(username, password, cb) {
     try {
       const result = await db.query("SELECT * FROM users WHERE email = $1 ", [
@@ -137,6 +148,28 @@ passport.use(
       console.log(err);
     }
   })
+);
+
+passport.use("google", new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: "http://localhost:3000/auth/google/secrets",
+  userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
+  }, async (accessToken, refreshToken, profile, cb) => {
+    console.log("Google Profile: ", profile);
+    try {
+      const result = await db.query("SELECT * FROM users WHERE email = $1", [profile.email]);
+      if(result.rows.length === 0) {
+        const newUser = await db.query("INSERT INTO users (email, password) VALUES ($1, $2)", [profile.email, "google"]);
+        cb(null, newUser.rows[0]);
+      } else {
+        cb(null, result.rows[0]);
+      }
+    } catch (error) {
+      cb(err);
+    }
+    }
+  )
 );
 
 passport.serializeUser((user, cb) => {
